@@ -11,4 +11,4 @@ TODO:
 
 ## References
 
-TODO:
+- [LC3 ISA](https://justinmeiners.github.io/lc3-vm/supplies/lc3-isa.pdf)
