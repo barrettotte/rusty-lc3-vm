@@ -16,7 +16,7 @@ fn main() {
     let mut vm = VirtualMachine::new();
 
     match vm.load_img(img_path) {
-        Ok(_) => println!("done."), //vm.run(),
+        Ok(_) => vm.run(),
         Err(e) => {
             println!(
                 "Failed to load image file '{}'\n{}",

@@ -1,3 +1,7 @@
+use super::registers::{Flag, Register};
+use std::fmt::{Display, Formatter, Result as FmtResult};
+
+#[derive(Debug)]
 pub enum OpCode {
     BR,   // 0x0 | conditional branch
     ADD,  // 0x1 | addition
@@ -17,10 +21,32 @@ pub enum OpCode {
     TRAP, // 0xF | system call
 }
 
-// sign extend value to n-bits
-fn sign_extend(u16 x, i8 bits) {
-    if ((x >> (bits - 1)) & 1) {
-       x |= (0xFFFF << bits); 
+impl OpCode {
+    pub fn from_u16(value: u16) -> OpCode {
+        match value {
+            0x0 => OpCode::BR,
+            0x1 => OpCode::ADD,
+            0x2 => OpCode::LD,
+            0x3 => OpCode::ST,
+            0x4 => OpCode::JSR,
+            0x5 => OpCode::AND,
+            0x6 => OpCode::LDR,
+            0x7 => OpCode::STR,
+            0x8 => OpCode::RTI,
+            0x9 => OpCode::NOT,
+            0xA => OpCode::LDI,
+            0xB => OpCode::STI,
+            0xC => OpCode::JMP,
+            0xD => OpCode::RES,
+            0xE => OpCode::LEA,
+            0xF => OpCode::TRAP,
+            _ => panic!("Unknown opcode: {}", value),
+        }
     }
-    return x;
+}
+
+impl Display for OpCode {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{:?}", self)
+    }
 }
