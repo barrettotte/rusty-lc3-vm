@@ -1,4 +1,3 @@
-use super::registers::{Flag, Register};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 #[derive(Debug)]
