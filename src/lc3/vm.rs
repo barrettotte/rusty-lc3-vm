@@ -1,5 +1,6 @@
-use super::opcodes::OpCode;
+use super::opcodes::*;
 use super::registers::{Flag, Register};
+use super::traps::*;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::fs::File;
 use std::io::{Read, Result as IoResult};
@@ -39,6 +40,8 @@ impl VirtualMachine {
 
     // run VM until halted
     pub fn run(&mut self) {
+        self.regs[Register::PC] = PC_START;
+
         while !self.is_halted {
             self.cycle();
             self.is_halted = true;
@@ -48,9 +51,11 @@ impl VirtualMachine {
 
     // perform one CPU cycle
     pub fn cycle(&mut self) {
-        let instr = self.get_curr_ins();
+        let instr = self.memory_read(self.regs[Register::PC]);
         let op = OpCode::from_u16(instr >> 12);
         println!("{}", op);
+
+        self.regs[Register::PC] += 1;
 
         match op {
             OpCode::BR => self.op_br(instr),
@@ -70,20 +75,11 @@ impl VirtualMachine {
             OpCode::LEA => self.op_lea(instr),
             OpCode::TRAP => self.op_trap(instr),
         }
-        // load one instruction from ram[pc]
-        // pc++
-        // determine instruction
-        // perform instruction
-    }
-
-    // get current instruction
-    fn get_curr_ins(&self) -> u16 {
-        self.memory_read(self.regs[Register::PC])
     }
 
     // read value from memory address
     fn memory_read(&self, addr: u16) -> u16 {
-        self.mem[addr as usize]
+        return self.mem[addr as usize];
     }
 
     // write value to memory address
@@ -227,12 +223,15 @@ impl VirtualMachine {
 
     fn op_trap(&mut self, instr: u16) {
         match TrapVector::from_u16(instr & 0xFF) {
-            TrapVector::GETC => {}
-            TrapVector::OUT => {}
-            TrapVector::PUTS => {}
-            TrapVector::IN => {}
-            TrapVector::PUTSP => {}
-            TrapVector::HALT => {}
+            TrapVector::GETC => trap_getc(&mut self.regs),
+            TrapVector::OUT => trap_out(&mut self.regs),
+            TrapVector::PUTS => trap_puts(self.regs[Register::R0], &mut self.mem),
+            TrapVector::IN => trap_in(&mut self.regs),
+            TrapVector::PUTSP => trap_putsp(&mut self.regs, &mut self.mem),
+            TrapVector::HALT => {
+                print!("HALT");
+                self.is_halted = true;
+            }
         }
     }
 }
@@ -244,29 +243,6 @@ impl Display for VirtualMachine {
             "{{\n    halt: {},\n    registers: {:02X?}\n}}",
             self.is_halted, self.regs
         )
-    }
-}
-
-pub enum TrapVector {
-    GETC = 0x20,  //
-    OUT = 0x21,   //
-    PUTS = 0x22,  //
-    IN = 0x23,    //
-    PUTSP = 0x24, //
-    HALT = 0x25,  //
-}
-
-impl TrapVector {
-    pub fn from_u16(value: u16) -> TrapVector {
-        match value {
-            0x20 => TrapVector::GETC,
-            0x21 => TrapVector::OUT,
-            0x22 => TrapVector::PUTS,
-            0x23 => TrapVector::IN,
-            0x24 => TrapVector::PUTSP,
-            0x25 => TrapVector::HALT,
-            _ => panic!("Unknown trap vector: {}", value),
-        }
     }
 }
 

@@ -1,5 +1,6 @@
 use std::ops::{Index, IndexMut};
 
+#[derive(Debug)]
 pub enum Register {
     R0,
     R1,
@@ -27,8 +28,15 @@ impl IndexMut<Register> for [u16] {
     }
 }
 
+// breakdown of COND register
 pub enum Flag {
     POS = 1 << 0,
     ZERO = 1 << 1,
     NEG = 1 << 2,
+}
+
+// memory mapped register
+pub enum MRegister {
+    MR_KBSR = 0xFE00, // keyboard status register
+    MR_KBDR = 0xFE02, // keyboard data register
 }
