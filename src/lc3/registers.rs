@@ -36,7 +36,7 @@ pub enum Flag {
 }
 
 // memory mapped register
-pub enum MRegister {
-    MR_KBSR = 0xFE00, // keyboard status register
-    MR_KBDR = 0xFE02, // keyboard data register
+pub enum MMRegister {
+    KBSR = 0xFE00, // keyboard status register
+    KBDR = 0xFE02, // keyboard data register
 }
