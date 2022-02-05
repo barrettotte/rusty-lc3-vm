@@ -58,7 +58,7 @@ pub fn op_br(instr: u16, regs: &mut [u16]) {
     let cond = (instr >> 9) & 0x7F; // NZP
 
     if (cond & regs[Register::COND]) > 0 {
-        regs[Register::PC] += pc_offset;
+        regs[Register::PC] = u16::wrapping_add(regs[Register::PC], pc_offset);
     }
 }
 
@@ -69,10 +69,11 @@ pub fn op_add(instr: u16, regs: &mut [u16]) {
     let is_imm = (instr >> 5) & 0x1;
 
     if is_imm == 1 {
-        regs[dr] = regs[sr1] + sign_extend(instr & 0x1F, 5);
+        let imm5 = sign_extend(instr & 0x1F, 5);
+        regs[dr] = u16::wrapping_add(regs[sr1], imm5);
     } else {
-        let sr2: usize = (instr & 0x7).into();
-        regs[dr] = regs[sr1] + regs[sr2];
+        let sr2: usize = (instr & 0x7) as usize;
+        regs[dr] = u16::wrapping_add(regs[sr1], regs[sr2]);
     }
     update_flags(regs, dr);
 }
@@ -80,26 +81,27 @@ pub fn op_add(instr: u16, regs: &mut [u16]) {
 // load
 pub fn op_ld(instr: u16, regs: &mut [u16], mem: &mut [u16]) {
     let dr = ((instr >> 9) & 0x7) as usize;
-    let offset = sign_extend(instr & 0x1FF, 9);
-    regs[dr] = memory_read(mem, regs[Register::PC] + offset);
+    let offset = u16::wrapping_add(regs[Register::PC], sign_extend(instr & 0x1FF, 9));
+
+    regs[dr] = memory_read(mem, offset);
     update_flags(regs, dr);
 }
 
 // store
 pub fn op_st(instr: u16, regs: &mut [u16], mem: &mut [u16]) {
     let sr = ((instr >> 9) & 0x7) as usize;
-    let offset = sign_extend(instr & 0x1FF, 9);
-    memory_write(mem, regs[Register::PC] + offset, regs[sr]);
+    let offset = u16::wrapping_add(regs[Register::PC], sign_extend(instr & 0x1FF, 9));
+    memory_write(mem, offset, regs[sr]);
 }
 
 // jump to subroutine
 pub fn op_jsr(instr: u16, regs: &mut [u16]) {
-    let is_long = (instr >> 11) & 0x1;
+    let is_long = (instr >> 11) & 1;
     regs[Register::R7] = regs[Register::PC];
 
     if is_long == 1 {
         let offset = sign_extend(instr & 0x7FF, 11);
-        regs[Register::PC] += offset; // JSR
+        regs[Register::PC] = u16::wrapping_add(regs[Register::PC], offset); // JSR
     } else {
         let base = ((instr >> 6) & 0x7) as usize;
         regs[Register::PC] = regs[base]; // JSRR
@@ -115,7 +117,7 @@ pub fn op_and(instr: u16, regs: &mut [u16]) {
     if is_imm == 1 {
         regs[dr] = regs[sr1] & sign_extend(instr & 0x1F, 5);
     } else {
-        let sr2: usize = (instr & 0x7).into();
+        let sr2: usize = (instr & 0x7) as usize;
         regs[dr] = regs[sr1] & regs[sr2];
     }
     update_flags(regs, dr);
@@ -126,7 +128,8 @@ pub fn op_ldr(instr: u16, regs: &mut [u16], mem: &mut [u16]) {
     let dr = ((instr >> 9) & 0x7) as usize;
     let base = ((instr >> 6) & 0x7) as usize;
     let offset = sign_extend(instr & 0x3F, 6);
-    regs[dr] = memory_read(mem, regs[base] + offset);
+
+    regs[dr] = memory_read(mem, u16::wrapping_add(regs[base], offset));
     update_flags(regs, dr);
 }
 
@@ -135,7 +138,7 @@ pub fn op_str(instr: u16, regs: &mut [u16], mem: &mut [u16]) {
     let sr = ((instr >> 9) & 0x7) as usize;
     let base = ((instr >> 6) & 0x7) as usize;
     let offset = sign_extend(instr & 0x3F, 6);
-    memory_write(mem, regs[base] + offset, regs[sr]);
+    memory_write(mem, u16::wrapping_add(regs[base], offset), regs[sr]);
 }
 
 // bitwise complement
@@ -150,7 +153,9 @@ pub fn op_not(instr: u16, regs: &mut [u16]) {
 pub fn op_ldi(instr: u16, regs: &mut [u16], mem: &mut [u16]) {
     let dr = ((instr >> 9) & 0x7) as usize;
     let offset = sign_extend(instr & 0x1FF, 9);
-    regs[Register::R0] = memory_read(mem, regs[Register::PC] + offset);
+    let addr = memory_read(mem, u16::wrapping_add(regs[Register::PC], offset));
+
+    regs[dr] = memory_read(mem, addr);
     update_flags(regs, dr);
 }
 
@@ -158,21 +163,22 @@ pub fn op_ldi(instr: u16, regs: &mut [u16], mem: &mut [u16]) {
 pub fn op_sti(instr: u16, regs: &mut [u16], mem: &mut [u16]) {
     let sr = ((instr >> 9) & 0x7) as usize;
     let offset = sign_extend(instr & 0x1FF, 9);
-    let indirect = memory_read(mem, regs[Register::PC] + offset);
+    let indirect = memory_read(mem, u16::wrapping_add(regs[Register::PC], offset));
     memory_write(mem, indirect, regs[sr]);
 }
 
 // jump / return from subroutine; this also handles RET
 pub fn op_jmp(instr: u16, regs: &mut [u16]) {
-    let addr = (instr >> 6) & 0x7F;
-    regs[Register::PC] = regs[addr as usize];
+    let base = (instr >> 6) & 0x7F;
+    regs[Register::PC] = regs[base as usize];
 }
 
 // load effective address
 pub fn op_lea(instr: u16, regs: &mut [u16]) {
     let dr = ((instr >> 9) & 0x7) as usize;
     let offset = sign_extend(instr & 0x1FF, 9);
-    regs[dr] = regs[Register::PC] + offset;
+
+    regs[dr] = u16::wrapping_add(regs[Register::PC], offset);
     update_flags(regs, dr);
 }
 

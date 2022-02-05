@@ -1,9 +1,10 @@
 use super::opcodes::*;
 use super::registers::Register;
 use super::traps::*;
+use byteorder::{BigEndian, ReadBytesExt};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::fs::File;
-use std::io::{Read, Result as IoResult};
+use std::io::{BufReader, Result as IoResult};
 use std::path::Path;
 
 const PC_START: u16 = 0x3000;
@@ -18,43 +19,55 @@ pub struct VirtualMachine {
 
 impl VirtualMachine {
     pub fn new() -> Self {
+        let mut regs: [u16; 10] = [0; 10];
+        regs[Register::PC] = PC_START;
+
         Self {
             mem: [0; MEM_SIZE],
-            regs: [0; 10],
+            regs: regs,
             is_halted: false,
         }
     }
 
     // load VM with LC3 program image
     pub fn load_img(&mut self, img_path: &Path) -> IoResult<()> {
-        let mut f = File::open(img_path).expect("File not found");
-        let mut buffer = Vec::new();
+        let f = File::open(img_path).expect("File not found");
+        let mut buff = BufReader::new(f);
 
-        f.read_to_end(&mut buffer)?;
-        for ins in buffer.iter() {
-            println!("{}", ins);
+        let org = buff.read_u16::<BigEndian>().expect("bad starting address");
+        let mut addr = org as usize;
+        loop {
+            match buff.read_u16::<BigEndian>() {
+                Ok(instr) => {
+                    self.mem[addr as usize] = instr;
+                    addr += 1;
+                }
+                Err(e) => {
+                    if e.kind() != std::io::ErrorKind::UnexpectedEof {
+                        println!("Error loading program: {}", e);
+                    }
+                    break;
+                }
+            }
         }
         Ok(())
     }
 
     // run VM until halted
     pub fn run(&mut self) {
-        self.is_halted = false;
-        self.regs[Register::PC] = PC_START;
-
         while !self.is_halted {
             self.cycle();
-            self.is_halted = true; // TODO: tmp
+
+            if self.regs[Register::PC] >= MEM_SIZE as u16 {
+                self.is_halted = true;
+            }
         }
-        println!("{}", self);
     }
 
     // perform one CPU cycle
     pub fn cycle(&mut self) {
         let instr = memory_read(&mut self.mem, self.regs[Register::PC]);
         let op = OpCode::from_u16(instr >> 12);
-        println!("{}", op);
-
         self.regs[Register::PC] += 1;
 
         match op {
@@ -77,6 +90,7 @@ impl VirtualMachine {
         }
     }
 
+    // handle trap vector
     fn trap(&mut self, instr: u16) {
         match TrapVector::from_u16(instr & 0xFF) {
             TrapVector::GETC => trap_getc(&mut self.regs),
